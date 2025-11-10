@@ -5,7 +5,7 @@ import type { ChatOpenAIFields, ClientOptions } from "@langchain/openai";
 import { PreferencesStore } from "../../../common/store";
 import { AIModelsEnum } from "./ai-models";
 
-type ParsedCustomModelOptions = {
+export type ParsedCustomModelOptions = {
   clientOptions?: ClientOptions;
   modelOptions?: Partial<Omit<ChatOpenAIFields, "model" | "apiKey" | "configuration">>;
 };
@@ -14,7 +14,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 };
 
-const parseCustomModelOptions = (rawOptions: string | undefined): ParsedCustomModelOptions => {
+export const parseCustomModelOptions = (
+  rawOptions: string | undefined,
+): ParsedCustomModelOptions => {
   if (!rawOptions || rawOptions.trim() === "") {
     return {};
   }

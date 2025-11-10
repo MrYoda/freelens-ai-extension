@@ -1,13 +1,138 @@
 import { Renderer } from "@freelensapp/extensions";
 import { observer } from "mobx-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PreferencesStore } from "../../../common/store";
+import { parseCustomModelOptions } from "../../business/provider/model-provider";
+import type { SingleValue } from "react-select";
 
 const {
-  Component: { Input, Switch, HorizontalLine },
+  Component: { Input, Switch, HorizontalLine, Select },
 } = Renderer;
+
+type StringSelectOption = Renderer.Component.SelectOption<string>;
 
 export const PreferencesPage = observer(() => {
   const preferencesStore: PreferencesStore = PreferencesStore.getInstanceOrCreate<PreferencesStore>();
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [modelFetchError, setModelFetchError] = useState<string | null>(null);
+  const [hasFetched, setHasFetched] = useState(false);
+
+  const customModelOptions = useMemo(() => parseCustomModelOptions(preferencesStore.customModelOptions), [
+    preferencesStore.customModelOptions,
+  ]);
+
+  useEffect(() => {
+    setAvailableModels([]);
+    setModelFetchError(null);
+    setHasFetched(false);
+  }, [
+    preferencesStore.customModelBaseUrl,
+    preferencesStore.customModelApiKey,
+    preferencesStore.customModelOptions,
+  ]);
+
+  const availableModelOptions = useMemo<StringSelectOption[]>(
+    () =>
+      availableModels.map((modelId) => ({
+        value: modelId,
+        label: modelId,
+      })),
+    [availableModels],
+  );
+
+  const onSelectFetchedModel = useCallback(
+    (option: SingleValue<StringSelectOption>) => {
+      if (option) {
+        preferencesStore.customModelId = option.value;
+      }
+    },
+    [preferencesStore],
+  );
+
+  const fetchAvailableModels = useCallback(async () => {
+    const trimmedBaseUrl = preferencesStore.customModelBaseUrl.trim();
+    setHasFetched(true);
+
+    if (!trimmedBaseUrl) {
+      setModelFetchError("Set the API base URL before loading models.");
+      setAvailableModels([]);
+      return;
+    }
+
+    try {
+      setIsLoadingModels(true);
+      setModelFetchError(null);
+
+      const normalizedBaseUrl = trimmedBaseUrl.replace(/\/+$/, "");
+      const modelsEndpoint = `${normalizedBaseUrl}/models`;
+      const headers = new Headers();
+
+      const defaultHeaders = customModelOptions.clientOptions?.defaultHeaders;
+      if (defaultHeaders) {
+        if (defaultHeaders instanceof Headers) {
+          defaultHeaders.forEach((value, key) => headers.set(key, value));
+        } else if (Array.isArray(defaultHeaders)) {
+          for (const [key, value] of defaultHeaders) {
+            headers.set(key, value);
+          }
+        } else if (typeof defaultHeaders === "object") {
+          for (const [headerName, headerValue] of Object.entries(defaultHeaders)) {
+            if (typeof headerValue === "string") {
+              headers.set(headerName, headerValue);
+            }
+          }
+        }
+      }
+
+      const apiKey = preferencesStore.customModelApiKey.trim();
+      if (apiKey) {
+        headers.set("Authorization", `Bearer ${apiKey}`);
+      }
+
+      const response = await fetch(modelsEndpoint, {
+        method: "GET",
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Unable to load models (status ${response.status})`);
+      }
+
+      const payload = await response.json();
+
+      const dataArray = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.models)
+            ? payload.models
+            : [];
+
+      const resolvedModels = dataArray
+        .map((entry) => {
+          if (typeof entry === "string") {
+            return entry;
+          }
+          if (entry && typeof entry === "object" && typeof entry.id === "string") {
+            return entry.id;
+          }
+          return undefined;
+        })
+        .filter((modelId): modelId is string => Boolean(modelId));
+
+      if (resolvedModels.length === 0) {
+        throw new Error("The endpoint returned an empty models list.");
+      }
+
+      setAvailableModels(resolvedModels);
+    } catch (error) {
+      setAvailableModels([]);
+      setModelFetchError(error instanceof Error ? error.message : "Failed to load models.");
+    } finally {
+      setIsLoadingModels(false);
+    }
+  }, [customModelOptions, preferencesStore.customModelApiKey, preferencesStore.customModelBaseUrl]);
 
   return (
     <>
@@ -44,6 +169,49 @@ export const PreferencesPage = observer(() => {
           value={preferencesStore.customModelApiKey}
           onChange={(value: string) => (preferencesStore.customModelApiKey = value)}
         />
+        <div style={{ marginTop: 8, fontWeight: "bold" }}>Discover models from endpoint</div>
+        <div style={{ color: "#aaa", fontSize: 13, marginTop: 4 }}>
+          Load available models from your OpenAI-compatible endpoint or type a model identifier manually
+          above.
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+          <button
+            style={{
+              padding: "6px 12px",
+              borderRadius: 4,
+              border: "1px solid #00a7a0",
+              background: isLoadingModels ? "rgba(0,167,160,0.35)" : "rgba(0,167,160,0.15)",
+              color: "#fff",
+              cursor: isLoadingModels ? "wait" : "pointer",
+              fontWeight: 500,
+            }}
+            disabled={isLoadingModels}
+            onClick={fetchAvailableModels}
+          >
+            {isLoadingModels ? "Loading models..." : "Load models"}
+          </button>
+          {modelFetchError && (
+            <span style={{ color: "#ff6b6b", fontSize: 13 }}>{modelFetchError}</span>
+          )}
+          {!modelFetchError && hasFetched && !isLoadingModels && availableModels.length === 0 && (
+            <span style={{ color: "#ccc", fontSize: 13 }}>No models detected.</span>
+          )}
+        </div>
+        {availableModelOptions.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <Select
+              placeholder="Select a model from the endpoint"
+              options={availableModelOptions}
+              value={
+                availableModelOptions.some((option) => option.value === preferencesStore.customModelId)
+                  ? preferencesStore.customModelId
+                  : undefined
+              }
+              onChange={onSelectFetchedModel}
+              themeName="lens"
+            />
+          </div>
+        )}
         <div style={{ marginTop: 8, fontWeight: "bold" }}>Advanced configuration (JSON)</div>
         <textarea
           style={{
