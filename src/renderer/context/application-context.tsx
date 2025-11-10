@@ -19,6 +19,10 @@ export interface AppContextType {
   explainEvent: MessageObject;
   ollamaHost: string;
   ollamaPort: string;
+  customModelId: string;
+  customModelBaseUrl: string;
+  customModelApiKey: string;
+  customModelOptions: string;
   conversationId: string;
   isLoading: boolean;
   isConversationInterrupted: boolean;
@@ -56,6 +60,30 @@ export const ApplicationContextProvider = observer(({ children }: { children: Re
 
   const mcpAgentSystem = useMcpAgent(preferencesStore.mcpConfiguration);
   const freeLensAgentSystem = useFreeLensAgentSystem();
+
+  const resolvedCustomModelId = process.env.FREELENS_CUSTOM_MODEL_ID || preferencesStore.customModelId;
+  const resolvedCustomModelBaseUrl =
+    process.env.FREELENS_CUSTOM_MODEL_BASE_URL || preferencesStore.customModelBaseUrl;
+  const resolvedCustomModelApiKey = process.env.FREELENS_CUSTOM_MODEL_API_KEY || preferencesStore.customModelApiKey;
+  const resolvedCustomModelOptions =
+    process.env.FREELENS_CUSTOM_MODEL_OPTIONS_JSON || preferencesStore.customModelOptions;
+
+  const resolveApiKey = () => {
+    switch (preferencesStore.selectedModel) {
+      case AIModelsEnum.GEMINI_2_FLASH:
+        return process.env.GOOGLE_API_KEY || preferencesStore.googleAIKey;
+      case AIModelsEnum.CUSTOM_OPENAI_COMPATIBLE:
+        return (
+          resolvedCustomModelApiKey ||
+          process.env.OPENAI_API_KEY ||
+          preferencesStore.openAIKey
+        );
+      default:
+        return process.env.OPENAI_API_KEY || preferencesStore.openAIKey;
+    }
+  };
+
+  const resolvedApiKey = resolveApiKey() ?? "";
 
   // Init variables
   useEffect(() => {
@@ -280,13 +308,17 @@ export const ApplicationContextProvider = observer(({ children }: { children: Re
   return (
     <AppContext.Provider
       value={{
-        apiKey: preferencesStore.openAIKey,
+        apiKey: resolvedApiKey,
         selectedModel: preferencesStore.selectedModel,
         mcpEnabled: preferencesStore.mcpEnabled,
         mcpConfiguration: preferencesStore.mcpConfiguration,
         explainEvent: preferencesStore.explainEvent,
         ollamaHost: preferencesStore.ollamaHost,
         ollamaPort: preferencesStore.ollamaPort,
+        customModelId: resolvedCustomModelId,
+        customModelBaseUrl: resolvedCustomModelBaseUrl,
+        customModelApiKey: resolvedCustomModelApiKey,
+        customModelOptions: resolvedCustomModelOptions,
         conversationId,
         isLoading,
         isConversationInterrupted,

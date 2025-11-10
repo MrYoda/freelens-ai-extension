@@ -1,5 +1,5 @@
 import { Renderer } from "@freelensapp/extensions";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AIModelInfos, AIModelsEnum, toAIModelEnum } from "../../business/provider/ai-models";
 import { useApplicationStatusStore } from "../../context/application-context";
 
@@ -14,10 +14,19 @@ const MAX_ROWS = 5;
 export const useTextInput = ({ onSend }: TextInputHookProps) => {
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const modelSelections = Object.entries(AIModelInfos).map(([value, aiModelInfo]) => {
-    return { value, label: aiModelInfo.description };
-  });
   const applicationStatusStore = useApplicationStatusStore();
+  const modelSelections = useMemo(() => {
+    return Object.entries(AIModelInfos).map(([value, aiModelInfo]) => {
+      let label = aiModelInfo.description;
+      if (value === AIModelsEnum.CUSTOM_OPENAI_COMPATIBLE) {
+        const suffix = applicationStatusStore.customModelId
+          ? ` (${applicationStatusStore.customModelId})`
+          : " (configure in settings)";
+        label = `${aiModelInfo.description}${suffix}`;
+      }
+      return { value: value as AIModelsEnum, label };
+    });
+  }, [applicationStatusStore.customModelId]);
 
   const adaptTextareaHeight = () => {
     const textarea = textareaRef.current;

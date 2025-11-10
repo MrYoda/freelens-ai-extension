@@ -2,6 +2,7 @@ import { Command } from "@langchain/langgraph";
 import { MessageObject } from "../../renderer/business/objects/message-object";
 import { getInterruptMessage, getTextMessage } from "../../renderer/business/objects/message-object-provider";
 import { MessageType } from "../../renderer/business/objects/message-type";
+import { AIModelsEnum } from "../../renderer/business/provider/ai-models";
 import { AgentService, useAgentService } from "../../renderer/business/service/agent-service";
 import { AiAnalysisService, useAiAnalysisService } from "../../renderer/business/service/ai-analysis-service";
 import { ActionToApprove } from "../../renderer/components/chat";
@@ -40,8 +41,13 @@ const useChatService = () => {
             applicationStatusStore.setLoading(false);
           });
         } else {
+          const resolvedModelName =
+            applicationStatusStore.selectedModel === AIModelsEnum.CUSTOM_OPENAI_COMPATIBLE
+              ? applicationStatusStore.customModelId || AIModelsEnum.CUSTOM_OPENAI_COMPATIBLE
+              : applicationStatusStore.selectedModel;
+
           const agentInput = {
-            modelName: applicationStatusStore.selectedModel,
+            modelName: resolvedModelName,
             modelApiKey: applicationStatusStore.apiKey,
             messages: [{ role: "user", content: message.text }],
           };
