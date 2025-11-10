@@ -13,6 +13,7 @@ export enum AIModelsEnum {
   // OLLAMA_LLAMA32_1B = "llama3.2:1b",
   // OLLAMA_MISTRAL_7B = "mistral:7b",
   GEMINI_2_FLASH = "gemini-2.0-flash",
+  CUSTOM_OPENAI_COMPATIBLE = "custom-openai-compatible",
 }
 
 export const toAIModelEnum = (value: AIModelsEnum) => {
@@ -24,6 +25,7 @@ export enum AIProviders {
   // DEEP_SEEK = "deep-seek",
   // OLLAMA = "ollama",
   GOOGLE = "google",
+  CUSTOM = "custom",
 }
 
 export const AIModelInfos: Record<string, AIModelInfo> = {
@@ -36,4 +38,8 @@ export const AIModelInfos: Record<string, AIModelInfo> = {
   // [AIModelsEnum.OLLAMA_LLAMA32_1B]: { description: "ollama-llama3.2 1b", provider: AIProviders.OLLAMA },
   // [AIModelsEnum.OLLAMA_MISTRAL_7B]: { description: "ollama mistral:7b", provider: AIProviders.OLLAMA },
   [AIModelsEnum.GEMINI_2_FLASH]: { description: "gemini 2.0 flash", provider: AIProviders.GOOGLE },
+  [AIModelsEnum.CUSTOM_OPENAI_COMPATIBLE]: {
+    description: "custom openai-compatible",
+    provider: AIProviders.CUSTOM,
+  },
 };
